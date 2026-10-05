@@ -1,3 +1,4 @@
+# ------------------------------------------------------------------------------
 # 02_pull_mart_data.R
 #
 # Purpose:
@@ -19,6 +20,7 @@
 # - A structural summary (glimpse + row/column count) is printed on load as a
 #   lightweight confirmation that the pull succeeded and the shape is as expected.
 #   This is not a substitute for the formal validation in 03_validate_transfer.R.
+# ------------------------------------------------------------------------------
 
 source("r/01_connect_db.R")
 

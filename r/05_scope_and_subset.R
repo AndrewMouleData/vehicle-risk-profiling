@@ -11,9 +11,10 @@
 # - Two output objects are produced:
 #     risk_profiles_scoped
 #       Applies the minimum vehicle count threshold (>= 500) and excludes vehicle
-#       types that fall outside the project's motor insurance scope. Profiles with
-#       undefined analytical dimensions are retained at this stage so aggregate
-#       coverage and residual data-quality limitations remain visible.
+#       types that are not motor vehicles or cannot form vehicle-characteristic 
+#       profiles. Profiles with undefined analytical dimensions are retained at 
+#       this stage so aggregate coverage and residual data-quality limitations
+#       remain visible.
 #
 #     risk_profiles_reporting
 #       Derived from risk_profiles_scoped, with profiles additionally excluded
@@ -38,21 +39,25 @@
 #    involvements while removing profiles that contribute little coverage but
 #    disproportionate instability.
 #
-# 2. Out-of-scope vehicle types:
-#    - Pedal cycle (1)
-#    - Ridden horse (16)
-#    - Tram (18)
-#    - Mobility scooter (22)
-#    These appear in STATS19 because it records a broad set of road users, but
-#    they are outside the business scope of third-party motor insurance pricing.
+# 2. Profiles without defined vehicle characteristics:
+#    The framework profiles vehicles by propulsion, engine capacity band and
+#    vehicle age band. Records lacking these details cannot form interpretable
+#    profiles, and are handled in two steps:
 #
-# 3. Simultaneously undefined profiles (reporting only):
-#    Profiles where propulsion, engine capacity band, and vehicle age band are
-#    all unknown/undefined are retained in risk_profiles_scoped to preserve
-#    transparency about the remaining dataset after business scoping. However,
-#    they are excluded from risk_profiles_reporting because they do not form
-#    interpretable vehicle segments and cannot support meaningful underwriting
-#    commentary or stakeholder-facing insight.
+#    a) Non-profilable vehicle types (applied in risk_profiles_scoped):
+#       Pedal cycle (1), Ridden horse (16), Tram (18) and Mobility scooter (22)
+#       appear in STATS19 because it records a broad set of road users, but have
+#       no propulsion, engine capacity or vehicle age recorded (100% undefined
+#       for pedal cycles, horses and trams; at least 98.7% for mobility
+#       scooters). They are excluded by type so they do not distort the coverage
+#       figures for the scoped dataset.
+#
+#    b) Simultaneously undefined profiles (applied in risk_profiles_reporting only):
+#       Profiles where propulsion, engine capacity band and vehicle age band are
+#       all unknown/undefined are retained in risk_profiles_scoped, so the residual
+#       data-quality limitation stays visible in the coverage figures. They are
+#       excluded from risk_profiles_reporting because they cannot support
+#       characteristic-level interpretation.
 # ------------------------------------------------------------------------------
 
 source("r/01_connect_db.R")
@@ -65,23 +70,23 @@ source("r/02_pull_mart_data.R")
 
 MIN_VEHICLE_COUNT <- 500
 
-OUT_OF_SCOPE_TYPES <- c(
-  1,   # Pedal cycle      — not a motor vehicle
-  16,  # Ridden horse     — not a motor vehicle
-  18,  # Tram             — not privately insured under motor policy
-  22   # Mobility scooter — not covered under third-party motor insurance
+NON_PROFILABLE_TYPES <- c(
+  1,   # Pedal cycle      — no propulsion, engine or vehicle age recorded
+  16,  # Ridden horse     — no propulsion, engine or vehicle age recorded
+  18,  # Tram             — no propulsion, engine or vehicle age recorded
+  22   # Mobility scooter — propulsion, engine and age almost always unrecorded
 )
 
 # ------------------------------------------------------------------------------
 # risk_profiles_scoped
-# Applies threshold and out-of-scope vehicle type exclusions.
+# Applies threshold and non-profilable vehicle type exclusions.
 # Simultaneously undefined profiles are retained at this stage.
 # ------------------------------------------------------------------------------
 
 risk_profiles_scoped <- risk_profiles |>
   filter(
     vehicle_count >= MIN_VEHICLE_COUNT,
-    !vehicle_type %in% OUT_OF_SCOPE_TYPES
+    !vehicle_type %in% NON_PROFILABLE_TYPES
   )
 
 # ------------------------------------------------------------------------------
@@ -101,6 +106,9 @@ risk_profiles_reporting <- risk_profiles_scoped |>
 # Coverage summary
 # Confirms the size and vehicle coverage of each output object relative to
 # the full dataset. Printed for transparency and pipeline auditability.
+# Note: coverage percentages here use the full dataset (including non-profilable
+# vehicle types) as the denominator. Figure 6 in 06_visualisation.R uses the
+# profilable total instead, so its percentages differ.
 # ------------------------------------------------------------------------------
 
 total_vehicles_full <- sum(risk_profiles$vehicle_count, na.rm = TRUE)

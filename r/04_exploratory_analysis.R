@@ -2,13 +2,14 @@
 # 04_exploratory_analysis.R
 #
 # Purpose:
-# - Produce structured exploratory outputs directly aligned to the business task:
-#   "which vehicle profiles represent the highest relative third-party injury
-#    risk?"
-# - Rank profiles by risk_proxy_score and decompose risk into its frequency and
-#   severity components.
-# - Identify tail-risk segments (high severity, low frequency) and volume-risk
-#   segments (high frequency, moderate severity).
+# - Produce structured exploratory outputs aligned to the business task:
+#   "to what extent can open UK road safety data profile vehicles by collision
+#   involvement and injury severity, and where do its limitations prevent
+#   reliable profiling?"
+# - Rank profiles by risk_proxy_score and decompose the contribution score into
+#   its frequency and average-severity components.
+# - Identify high-severity / low-frequency profiles and high-frequency /
+#   lower-severity profiles.
 #
 # Design choices:
 # - All exploratory analysis is performed on the full unscoped dataset. No 
@@ -19,13 +20,13 @@
 #   is deferred to 06_visualisation.R.
 # - Columns are rounded for display and readability only. Source columns in
 #   risk_profiles remain unrounded.
-# - Analysis follows the frequency x severity framework of this project:
-#   1. Ranked profiles by risk_proxy_score       (headline result)
-#   2. Frequency vs severity decomposition       (structural interpretation)
-#   3. High-severity / low-frequency segments    (tail risk)
-#   4. High-frequency / moderate-severity        (volume risk)
-#   5. Vehicle count distribution                (exposure observation)
-#   6. Threshold sensitivity analysis            (informs 05_scope_and_subset.R)
+# - Analysis follows the frequency x severity contribution framework of this project:
+#   1. Ranked profiles by risk_proxy_score                    (headline contribution view)
+#   2. Frequency vs severity decomposition                    (structural interpretation)
+#   3. High-severity / low-frequency profiles                 (severity-led profiles)
+#   4. High-frequency / lower-severity profiles               (volume-led profiles)
+#   5. Vehicle count distribution                             (collision-involvement volume)
+#   6. Threshold sensitivity analysis                         (informs 05_scope_and_subset.R)
 # ------------------------------------------------------------------------------
 
 source("r/01_connect_db.R")
@@ -35,13 +36,13 @@ source("r/02_pull_mart_data.R")
 # 1. Ranked profiles by risk_proxy_score
 # ------------------------------------------------------------------------------
 
-message("\n--- 1a: Top 10 profiles by risk_proxy_score ---")
+message("\n--- 1a: Top 10 profiles by contribution score ---")
 risk_profiles |>
   arrange(risk_rank) |>
   mutate(
-    frequency_pct        = round(frequency_share * 100, 2),
-    avg_severity_rounded = round(avg_weighted_severity_per_vehicle, 2),
-    risk_score_pct       = round(risk_proxy_score * 100, 2)
+    frequency_pct            = round(frequency_share * 100, 2),
+    avg_severity_rounded     = round(avg_weighted_severity_per_vehicle, 2),
+    contribution_score_pct   = round(risk_proxy_score * 100, 2)
   ) |>
   select(
     risk_rank,
@@ -52,18 +53,18 @@ risk_profiles |>
     vehicle_count,
     avg_severity_rounded,
     frequency_pct,
-    risk_score_pct
+    contribution_score_pct
   ) |>
   slice_head(n = 10) |>
   print()
 
-message("\n--- 1b: Bottom 10 profiles by risk_proxy_score ---")
+message("\n--- 1b: Bottom 10 profiles by contribution score ---")
 risk_profiles |>
   arrange(desc(risk_rank)) |>
   mutate(
-    frequency_pct        = round(frequency_share * 100, 2),
-    avg_severity_rounded = round(avg_weighted_severity_per_vehicle, 2),
-    risk_score_pct       = round(risk_proxy_score * 100, 2)
+    frequency_pct            = round(frequency_share * 100, 2),
+    avg_severity_rounded     = round(avg_weighted_severity_per_vehicle, 2),
+    contribution_score_pct   = round(risk_proxy_score * 100, 2)
   ) |>
   select(
     risk_rank,
@@ -74,12 +75,12 @@ risk_profiles |>
     vehicle_count,
     avg_severity_rounded,
     frequency_pct,
-    risk_score_pct
+    contribution_score_pct
   ) |>
   slice_head(n = 10) |>
   print()
 
-message("\n--- 1c: Distribution of risk_proxy_score ---")
+message("\n--- 1c: Distribution of contribution scores ---")
 summary(risk_profiles$risk_proxy_score)
 
 risk_profiles |>
@@ -124,18 +125,19 @@ risk_profiles_quadrants |>
   print()
 
 # ------------------------------------------------------------------------------
-# 3. Tail-risk segments: high severity, low frequency
-# These appear rarely in collisions but produce severe injuries when they do.
+# 3. High-severity / low-frequency profiles
+# These appear less often in the collision-involved dataset but have higher
+# average recorded injury-burden signals.
 # ------------------------------------------------------------------------------
 
-message("\n--- 3: Tail-risk segments (high severity / low frequency) ---")
+message("\n--- 3: High-severity / low-frequency profiles ---")
 risk_profiles_quadrants |>
   filter(risk_quadrant == "Low frequency / High severity") |>
   arrange(desc(avg_weighted_severity_per_vehicle)) |>
   mutate(
-    frequency_pct        = round(frequency_share * 100, 2),
-    avg_severity_rounded = round(avg_weighted_severity_per_vehicle, 2),
-    risk_score_pct       = round(risk_proxy_score * 100, 2)
+    frequency_pct            = round(frequency_share * 100, 2),
+    avg_severity_rounded     = round(avg_weighted_severity_per_vehicle, 2),
+    contribution_score_pct   = round(risk_proxy_score * 100, 2)
   ) |>
   select(
     vehicle_type_label,
@@ -145,24 +147,25 @@ risk_profiles_quadrants |>
     vehicle_count,
     avg_severity_rounded,
     frequency_pct,
-    risk_score_pct
+    contribution_score_pct
   ) |>
   slice_head(n = 15) |>
   print()
 
 # ------------------------------------------------------------------------------
-# 4. Volume-risk segments: high frequency, low or moderate severity
-# These dominate the collision dataset and drive aggregate exposure.
+# 4. High-frequency / lower-severity profiles
+# These appear frequently in the collision-involved dataset and can still make a
+# meaningful aggregate contribution because of their volume.
 # ------------------------------------------------------------------------------
 
-message("\n--- 4: Volume-risk segments (high frequency / low severity) ---")
+message("\n--- 4: High-frequency / lower-severity profiles ---")
 risk_profiles_quadrants |>
   filter(risk_quadrant == "High frequency / Low severity") |>
   arrange(desc(frequency_share)) |>
   mutate(
-    frequency_pct        = round(frequency_share * 100, 2),
-    avg_severity_rounded = round(avg_weighted_severity_per_vehicle, 2),
-    risk_score_pct       = round(risk_proxy_score * 100, 2)
+    frequency_pct            = round(frequency_share * 100, 2),
+    avg_severity_rounded     = round(avg_weighted_severity_per_vehicle, 2),
+    contribution_score_pct   = round(risk_proxy_score * 100, 2)
   ) |>
   select(
     vehicle_type_label,
@@ -172,7 +175,7 @@ risk_profiles_quadrants |>
     vehicle_count,
     avg_severity_rounded,
     frequency_pct,
-    risk_score_pct
+    contribution_score_pct
   ) |>
   slice_head(n = 15) |>
   print()

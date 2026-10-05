@@ -2,7 +2,7 @@
 # 01_connect_db.R
 #
 # Purpose:
-# - Establish a reusable connection to the predicting_premium_risk PostgreSQL
+# - Establish a reusable connection to the vehicle_risk_profiling PostgreSQL
 #   database using credentials stored in .Renviron at the project root.
 # - Create a single connection object (con) to be used by all downstream scripts.
 # - Call packages necessary for downstream functional programming.

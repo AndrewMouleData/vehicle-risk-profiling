@@ -189,8 +189,8 @@ top_10_risk_profiles_plot <- ggplot(
   geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
-    title    = "Top 10 Vehicle Risk Profiles",
-    subtitle = "Ranked by risk proxy score (frequency × weighted severity), 2015–2024",
+    title    = "Top 10 Vehicle Profiles by Contribution Score",
+    subtitle = "Ranked by risk proxy score (frequency share × average weighted severity), 2015–2024",
     x        = NULL,
     y        = "Risk proxy score",
     caption  = reporting_caption
@@ -252,10 +252,12 @@ grouped_vehicle_type_risk_contribution <- risk_profiles_reporting |>
   summarise(
     total_risk_contribution = sum(risk_proxy_score, na.rm = TRUE),
     vehicle_count           = sum(vehicle_count, na.rm = TRUE),
+    weighted_severity_total = sum(weighted_severity_total, na.rm = TRUE),
     .groups = "drop"
   ) |>
   arrange(desc(total_risk_contribution)) |>
   mutate(
+    avg_severity_per_vehicle = weighted_severity_total / vehicle_count,
     pct_total_risk = total_risk_contribution /
       sum(total_risk_contribution) * 100,
     grouped_vehicle_type_label = fct_reorder(
@@ -263,6 +265,8 @@ grouped_vehicle_type_risk_contribution <- risk_profiles_reporting |>
       pct_total_risk
     )
   )
+
+print(grouped_vehicle_type_risk_contribution)
 
 grouped_vehicle_type_risk_contribution_plot <- ggplot(
   grouped_vehicle_type_risk_contribution,
@@ -326,6 +330,19 @@ save_plot(
   width = 9
 )
 
+message("--- Reporting subset depth ---")
+risk_profiles_reporting |>
+  summarise(
+    profiles        = n(),
+    under_1000      = sum(vehicle_count < 1000),
+    under_5000      = sum(vehicle_count < 5000),
+    under_10000     = sum(vehicle_count < 10000),
+    pct_under_1000  = round(under_1000 / profiles * 100, 1),
+    pct_under_5000  = round(under_5000 / profiles * 100, 1),
+    pct_under_10000 = round(under_10000 / profiles * 100, 1)
+  ) |>
+  print()
+
 # ------------------------------------------------------------------------------
 # Chart 6: Coverage summary
 # Compares eligible vehicle-category profiles before thresholding, the scoped
@@ -335,7 +352,7 @@ save_plot(
 
 eligible_vehicle_profiles <- risk_profiles |>
   filter(
-    !vehicle_type %in% OUT_OF_SCOPE_TYPES
+    !vehicle_type %in% NON_PROFILABLE_TYPES
   )
 
 total_vehicles_eligible <- sum(
@@ -345,7 +362,7 @@ total_vehicles_eligible <- sum(
 
 coverage_summary <- tibble(
   dataset = c(
-    "All in-scope\ngrouped profiles",
+    "All profilable\ngrouped profiles",
     "Profiles with\n≥ 500 vehicles",
     "Final reporting\nsubset"
   ),
@@ -375,6 +392,8 @@ coverage_summary <- tibble(
 ) |>
   mutate(dataset = fct_inorder(dataset))
 
+print(coverage_summary)
+
 coverage_summary_long <- coverage_summary |>
   pivot_longer(
     cols      = c(profiles, pct_vehicles),
@@ -397,7 +416,7 @@ coverage_summary_plot <- ggplot(
   facet_wrap(~ metric, scales = "free_y") +
   scale_fill_manual(
     values = c(
-      "All in-scope\ngrouped profiles" = "grey70",
+      "All profilable\ngrouped profiles" = "grey70",
       "Profiles with\n≥ 500 vehicles"  = "steelblue",
       "Final reporting\nsubset"        = "darkorange3"
     )
@@ -407,7 +426,7 @@ coverage_summary_plot <- ggplot(
     subtitle = "Profiles retained and vehicle coverage after count thresholding and undefined-profile removal",
     x        = NULL,
     y        = NULL,
-    caption  = "Source: UK STATS19, 2015–2024. Relevant raw profiles exclude road users outside the third-party motor insurance scope."
+    caption  = "Source: UK STATS19, 2015–2024. Profilable total excludes vehicle types with no recorded characteristics (pedal cycles, horses, trams, mobility scooters)."
   ) +
   viz_theme
 

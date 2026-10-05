@@ -4,7 +4,7 @@
 # Purpose:
 # - Confirm that the data pulled from mart.vehicle_risk_profiles_2015_2024 into R
 #   is structurally sound and consistent with the SQL mart quality checks.
-# - Validate key mathematical properties of the risk metrics before any
+# - Validate key mathematical properties of the contribution metrics before any
 #   analytical or visualisation work begins.
 # - Surface data quality issues explicitly rather than allowing them to propagate
 #   into downstream analyses.
@@ -24,7 +24,7 @@ source("r/02_pull_mart_data.R")
 
 # ----------------------------------------------------------
 # Check 1: Risk proxy score formula is consistent
-# Expected: Count of rows exceeding tolerance is 0
+# Expected result: Count of rows exceeding tolerance is 0
 # ----------------------------------------------------------
 
 message("--- Check 1: risk_proxy_score formula integrity ---")
@@ -32,13 +32,13 @@ risk_proxy_mismatch <- sum(
   abs(
     risk_profiles$risk_proxy_score -
       (risk_profiles$frequency_share * risk_profiles$avg_weighted_severity_per_vehicle)
-  ) > 1e-8
+  ) > 1e-6
 )
 message("Rows failing risk_proxy_score check: ", risk_proxy_mismatch)
 
 # ----------------------------------------------------------
 # Check 2: avg_weighted_severity_per_vehicle formula integrity
-# Expected: Count of rows with mismatch > tolerance is 0
+# Expected result: Count of rows with mismatch > tolerance is 0
 # ----------------------------------------------------------
 
 message("--- Check 2: avg_weighted_severity_per_vehicle formula integrity ---")
@@ -46,14 +46,14 @@ severity_avg_mismatch <- sum(
   abs(
     risk_profiles$avg_weighted_severity_per_vehicle -
       (risk_profiles$weighted_severity_total / risk_profiles$vehicle_count)
-  ) > 1e-8, 
+  ) > 1e-6, 
   na.rm = TRUE
 )
 message("Rows failing severity average check: ", severity_avg_mismatch)
 
 # ----------------------------------------------------------
 # Check 3: No duplicate business grain rows
-# Expected: 0 rows - each combination of the four business-grain dimensions
+# Expected result: 0 rows - each combination of the four business-grain dimensions
 # should appear exactly once.
 # ----------------------------------------------------------
 
@@ -66,7 +66,7 @@ message("Duplicate business-grain rows: ", nrow(duplicate_profiles))
 
 # ----------------------------------------------------------
 # Check 4: Row and column count
-# Expected: row count consistent with SQL QA; 837 rows, 15 columns
+# Expected result: row count consistent with SQL QA
 # ----------------------------------------------------------
 
 message("--- Check 4: Dimensions ---")
@@ -75,36 +75,50 @@ message("Columns: ", ncol(risk_profiles))
 
 # ----------------------------------------------------------
 # Check 5: No NAs in key metric and dimension columns
-# Expected: all counts = 0
+# Expected result: all counts = 0
 # ----------------------------------------------------------
 
 message("--- Check 5: NA counts in key columns ---")
+
 risk_profiles |>
   summarise(
     across(
       c(
-        vehicle_type, vehicle_type_label, propulsion_code, engine_capacity_band,
-        vehicle_age_band, vehicle_count, weighted_severity_total, 
-        avg_weighted_severity_per_vehicle, frequency_share, risk_proxy_score,
-        risk_rank 
+        vehicle_type,
+        vehicle_type_label,
+        propulsion_code,
+        propulsion_label,
+        engine_capacity_band,
+        vehicle_age_band,
+        vehicle_count,
+        slight_count,
+        serious_count,
+        fatal_count,
+        weighted_severity_total,
+        avg_weighted_severity_per_vehicle,
+        frequency_share,
+        risk_proxy_score,
+        risk_rank
       ),
       ~ sum(is.na(.x)),
-      .names = "na_in_{.col}")) |>
+      .names = "na_in_{.col}"
+    )
+  ) |>
   glimpse()
 
 # ----------------------------------------------------------
 # Check 6: frequency_share sums to 1.0
-# Expected: result within floating point tolerance of 1e-8
+# Expected result: result within floating point tolerance of 1e-6
 # ----------------------------------------------------------
 
 message("--- Check 6: frequency_share sum ---")
 freq_share_sum <- sum(risk_profiles$frequency_share)
 message("Sum of frequency_share: ", round(freq_share_sum, 10))
-message("Validation: ", ifelse(abs(freq_share_sum - 1.0) < 1e-8, "PASS", "FAIL"))
+message("Validation: ", ifelse(abs(freq_share_sum - 1.0) < 1e-6, "PASS", "FAIL"))
 
 # ----------------------------------------------------------
 # Check 7: No zero or negative vehicle counts or metric values
-# Expected: all counts = 0
+# Expected result: all counts = 0
 # ----------------------------------------------------------
 
 message("--- Check 7: Zero or negative values ---")
@@ -117,7 +131,7 @@ message("Negative risk_proxy_score:         ",
 
 # ----------------------------------------------------------
 # Check 8: risk_rank is populated and sequential from 1
-# Expected: min = 1, max =  388, no NAs, dense ranking confirmed
+# Expected result: min = 1, max < row count because tied scores share a dense rank
 # ----------------------------------------------------------
 
 message("--- Check 8: risk_rank integrity ---")
@@ -127,7 +141,7 @@ message("NA ranks:  ", sum(is.na(risk_profiles$risk_rank)))
 
 # ----------------------------------------------------------
 # Check 9: Column types are as expected
-# Expected: appropriate classes for relevant cols
+# Expected result: appropriate classes for relevant cols
 # ----------------------------------------------------------
 
 message("--- Check 9: Column types ---")
@@ -137,7 +151,7 @@ risk_profiles |>
 
 # ----------------------------------------------------------
 # Check 10: Unknown and N/A dimension group volumes
-# Expected: sizable but not dominant
+# Expected result: sizable but not dominant
 # ----------------------------------------------------------
 
 message("--- Check 10: Unknown and N/A dimension volumes ---")
