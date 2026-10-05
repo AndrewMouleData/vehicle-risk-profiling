@@ -32,9 +32,9 @@
 # Outputs:
 #   figures/
 #     01_frequency_severity_quadrants.png
-#     02_top_10_risk_profiles.png
-#     03_risk_proxy_distribution.png
-#     04_grouped_vehicle_type_risk_contribution.png
+#     02_top_10_contribution_profiles.png
+#     03_contribution_score_distribution.png
+#     04_grouped_vehicle_type_contribution.png
 #     05_vehicle_count_distribution.png
 #     06_coverage_summary.png
 # ------------------------------------------------------------------------------
@@ -148,9 +148,9 @@ frequency_severity_quadrants_plot <- ggplot(
     )
   ) +
   labs(
-    title    = "Frequency vs Severity by Vehicle Risk Profile",
+    title    = "Frequency vs Severity by Collision-Involved Vehicle Profile",
     subtitle = "Each point represents one vehicle profile. Dashed lines show reporting medians.",
-    x        = "Frequency share (share of all collision involvements)",
+    x        = "Frequency share (share of collision-involved vehicles)",
     y        = "Avg weighted severity per vehicle",
     colour   = NULL,
     caption  = reporting_caption
@@ -165,7 +165,7 @@ save_plot(
 )
 
 # ------------------------------------------------------------------------------
-# Chart 2: Top 10 profiles by risk_proxy_score
+# Chart 2: Top 10 Vehicle Profiles by Contribution Score
 # ------------------------------------------------------------------------------
 
 top_10_risk_profiles <- risk_profiles_reporting |>
@@ -190,18 +190,18 @@ top_10_risk_profiles_plot <- ggplot(
   coord_flip() +
   labs(
     title    = "Top 10 Vehicle Profiles by Contribution Score",
-    subtitle = "Ranked by risk proxy score (frequency share × average weighted severity), 2015–2024",
+    subtitle = "Ranked by weighted injury-burden contribution, 2015–2024",
     x        = NULL,
-    y        = "Risk proxy score",
+    y        = "Contribution score",
     caption  = reporting_caption
   ) +
   viz_theme
 
 print(top_10_risk_profiles_plot)
-save_plot(top_10_risk_profiles_plot, "02_top_10_risk_profiles.png")
+save_plot(top_10_risk_profiles_plot, "02_top_10_contribution_profiles.png")
 
 # ------------------------------------------------------------------------------
-# Chart 3: Risk proxy score distribution
+# Chart 3: Distribution of Contribution Scores
 # ------------------------------------------------------------------------------
 
 risk_proxy_distribution_plot <- ggplot(
@@ -210,9 +210,9 @@ risk_proxy_distribution_plot <- ggplot(
 ) +
   geom_histogram(bins = 50, fill = "steelblue", colour = "white") +
   labs(
-    title    = "Distribution of Risk Proxy Scores",
+    title    = "Distribution of Contribution Scores",
     subtitle = "Across all vehicle profiles in the reporting dataset, 2015–2024",
-    x        = "Risk proxy score",
+    x        = "Contribution score",
     y        = "Number of profiles",
     caption  = reporting_caption
   ) +
@@ -221,18 +221,18 @@ risk_proxy_distribution_plot <- ggplot(
 print(risk_proxy_distribution_plot)
 save_plot(
   risk_proxy_distribution_plot,
-  "03_risk_proxy_distribution.png",
+  "03_contribution_score_distribution.png",
   width = 9
 )
 
 # ------------------------------------------------------------------------------
-# Chart 4: Aggregate risk contribution by grouped vehicle type
+# Chart 4: Aggregate Weighted Injury-Burden Contribution by Grouped Vehicle Type
 # Harmonises STATS19 vehicle_type_label values into broader grouped vehicle types
 # before aggregation, so categories are compared at a more consistent level than
 # the source vehicle-type labels allow.
 # ------------------------------------------------------------------------------
 
-grouped_vehicle_type_risk_contribution <- risk_profiles_reporting |>
+grouped_vehicle_type_contribution <- risk_profiles_reporting |>
   mutate(
     grouped_vehicle_type_label = case_when(
       vehicle_type_label == "Car" ~ "Car",
@@ -250,43 +250,43 @@ grouped_vehicle_type_risk_contribution <- risk_profiles_reporting |>
   ) |>
   group_by(grouped_vehicle_type_label) |>
   summarise(
-    total_risk_contribution = sum(risk_proxy_score, na.rm = TRUE),
+    total_contribution_score = sum(risk_proxy_score, na.rm = TRUE),
     vehicle_count           = sum(vehicle_count, na.rm = TRUE),
     weighted_severity_total = sum(weighted_severity_total, na.rm = TRUE),
     .groups = "drop"
   ) |>
-  arrange(desc(total_risk_contribution)) |>
+  arrange(desc(total_contribution_score)) |>
   mutate(
     avg_severity_per_vehicle = weighted_severity_total / vehicle_count,
-    pct_total_risk = total_risk_contribution /
-      sum(total_risk_contribution) * 100,
+    pct_total_contribution = total_contribution_score /
+      sum(total_contribution_score) * 100,
     grouped_vehicle_type_label = fct_reorder(
       grouped_vehicle_type_label,
-      pct_total_risk
+      pct_total_contribution
     )
   )
 
-print(grouped_vehicle_type_risk_contribution)
+print(grouped_vehicle_type_contribution)
 
-grouped_vehicle_type_risk_contribution_plot <- ggplot(
-  grouped_vehicle_type_risk_contribution,
-  aes(x = grouped_vehicle_type_label, y = pct_total_risk)
+grouped_vehicle_type_contribution_plot <- ggplot(
+  grouped_vehicle_type_contribution,
+  aes(x = grouped_vehicle_type_label, y = pct_total_contribution)
 ) +
   geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
-    title    = "Aggregate Risk Contribution by Grouped Vehicle Type",
-    subtitle = "Percentage contribution to total risk proxy score, 2015–2024",
+    title    = "Aggregate Weighted Injury-Burden Contribution by Grouped Vehicle Type",
+    subtitle = "Percentage contribution to total weighted injury-burden score, 2015–2024",
     x        = NULL,
-    y        = "% of total risk proxy score",
+    y        = "% of total contribution score",
     caption  = reporting_caption
   ) +
   viz_theme
 
-print(grouped_vehicle_type_risk_contribution_plot)
+print(grouped_vehicle_type_contribution_plot)
 save_plot(
-  grouped_vehicle_type_risk_contribution_plot,
-  "04_grouped_vehicle_type_risk_contribution.png",
+  grouped_vehicle_type_contribution_plot,
+  "04_grouped_vehicle_type_contribution.png",
   height = 7
 )
 
@@ -352,7 +352,7 @@ risk_profiles_reporting |>
 
 eligible_vehicle_profiles <- risk_profiles |>
   filter(
-    !vehicle_type %in% NON_PROFILABLE_TYPES
+    !vehicle_type %in% NON_ELIGIBLE_TYPES
   )
 
 total_vehicles_eligible <- sum(
@@ -362,7 +362,7 @@ total_vehicles_eligible <- sum(
 
 coverage_summary <- tibble(
   dataset = c(
-    "All profilable\ngrouped profiles",
+    "All eligible\nvehicle profiles",
     "Profiles with\n≥ 500 vehicles",
     "Final reporting\nsubset"
   ),
@@ -416,7 +416,7 @@ coverage_summary_plot <- ggplot(
   facet_wrap(~ metric, scales = "free_y") +
   scale_fill_manual(
     values = c(
-      "All profilable\ngrouped profiles" = "grey70",
+      "All eligible\nvehicle profiles" = "grey70",
       "Profiles with\n≥ 500 vehicles"  = "steelblue",
       "Final reporting\nsubset"        = "darkorange3"
     )
@@ -426,7 +426,7 @@ coverage_summary_plot <- ggplot(
     subtitle = "Profiles retained and vehicle coverage after count thresholding and undefined-profile removal",
     x        = NULL,
     y        = NULL,
-    caption  = "Source: UK STATS19, 2015–2024. Profilable total excludes vehicle types with no recorded characteristics (pedal cycles, horses, trams, mobility scooters)."
+    caption = "Source: UK STATS19, 2015–2024. Eligible total excludes vehicle types with little or no recorded vehicle-characteristic detail (pedal cycles, horses, trams, mobility scooters)."
   ) +
   viz_theme
 

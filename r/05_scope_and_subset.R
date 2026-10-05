@@ -70,7 +70,7 @@ source("r/02_pull_mart_data.R")
 
 MIN_VEHICLE_COUNT <- 500
 
-NON_PROFILABLE_TYPES <- c(
+NON_ELIGIBLE_TYPES <- c(
   1,   # Pedal cycle      — no propulsion, engine or vehicle age recorded
   16,  # Ridden horse     — no propulsion, engine or vehicle age recorded
   18,  # Tram             — no propulsion, engine or vehicle age recorded
